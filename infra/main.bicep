@@ -58,8 +58,7 @@ param postgresAdminGroupName string = ''
 param postgresAdminGroupObjectId string = ''
 
 var image = '${registryLoginServer}/${appName}:${imageTag}'
-// Key Vault and storage names are global and short: kv max 24, storage max 24 alnum.
-var kvName = take('kv-${appName}-${env}', 24)
+// Storage names are global and short: max 24 alnum.
 var storageName = take(toLower(replace('st${appName}${env}', '-', '')), 24)
 
 resource cae 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
@@ -72,20 +71,6 @@ resource runtimeIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-
   scope: resourceGroup(identityResourceGroup)
 }
 
-// ---------------- Key Vault: app secrets live here, never in the app ----------------
-resource kv 'Microsoft.KeyVault/vaults@2023-07-01' = {
-  name: kvName
-  location: location
-  tags: tags
-  properties: {
-    sku: { family: 'A', name: 'standard' }
-    tenantId: tenant().tenantId
-    enableRbacAuthorization: true
-    enableSoftDelete: true
-    softDeleteRetentionInDays: 90
-    enablePurgeProtection: env == 'prod' ? true : null
-  }
-}
 
 // ---------------- Storage (optional) ----------------
 resource st 'Microsoft.Storage/storageAccounts@2023-05-01' = if (enableStorage) {
@@ -159,7 +144,6 @@ var commonEnv = concat(
   [
     { name: 'AZURE_CLIENT_ID', value: runtimeIdentity.properties.clientId }
     { name: 'APP_ENV', value: env }
-    { name: 'KEY_VAULT_URI', value: kv.properties.vaultUri }
   ],
   enableStorage ? [
     { name: 'STORAGE_ACCOUNT', value: storageName }
